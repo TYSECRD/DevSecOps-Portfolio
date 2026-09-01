@@ -1,5 +1,5 @@
 from typing import Literal
-
+from app.detection import detect_brute_force
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, IPvAnyAddress
 
@@ -12,8 +12,6 @@ from app.database import (
 
 Severity = Literal["low", "medium", "high", "critical"]
 EventStatus = Literal["new", "investigating", "resolved"]
-
-BRUTE_FORCE_THRESHOLD = 5
 
 class SecurityEvent(BaseModel):
     source_ip: IPvAnyAddress
@@ -34,17 +32,6 @@ class SecurityAlert(BaseModel):
 
 app = FastAPI(title="SteelDoor Security API")
 initialize_database()
-
-def detect_brute_force(source_ip: str):
-    events = read_events()
-
-    failed_logins = [
-        event for event in events
-        if event["event_type"] == "failed_login"
-        and event["source_ip"] == source_ip
-    ]
-
-    return len(failed_logins) >= BRUTE_FORCE_THRESHOLD
 
 def create_brute_force_alert(source_ip: str):
     return SecurityAlert(
