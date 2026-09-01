@@ -1,11 +1,12 @@
 from fastapi import FastAPI
-from pydantic import BaseModel
+from pydantic import BaseModel, IPvAnyAddress
+from typing import Literal
 
 
 class SecurityEvent(BaseModel):
-    source_ip: str
+    source_ip: IPvAnyAddress
     event_type: str
-    severity: str
+    severity: Literal["low", "medium", "high", "critical"]
     description: str
 
 

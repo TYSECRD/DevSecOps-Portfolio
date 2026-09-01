@@ -70,3 +70,27 @@ def test_get_security_events():
     assert isinstance(data["events"], list)
     assert data["events"][-1]["event_type"] == "malware_detected"
     assert data["events"][-1]["severity"] == "critical"
+
+def test_reject_invalid_severity():
+    event = {
+        "source_ip": "172.16.0.10",
+        "event_type": "port_scan",
+        "severity": "extremely_bad",
+        "description": "Invalid severity test"
+    }
+
+    response = client.post("/api/events", json=event)
+
+    assert response.status_code == 422
+
+def test_reject_invalid_ip_address():
+    event = {
+        "source_ip": "not-an-ip-address",
+        "event_type": "failed_login",
+        "severity": "high",
+        "description": "Invalid IP address test"
+    }
+
+    response = client.post("/api/events", json=event)
+
+    assert response.status_code == 422
