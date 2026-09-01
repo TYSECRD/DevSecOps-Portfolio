@@ -25,6 +25,12 @@ class SecurityEvent(BaseModel):
 class EventStatusUpdate(BaseModel):
     status: EventStatus
 
+class SecurityAlert(BaseModel):
+    rule: str
+    source_ip: IPvAnyAddress
+    severity: Severity
+    message: str
+
 
 app = FastAPI(title="SteelDoor Security API")
 initialize_database()
@@ -39,6 +45,14 @@ def detect_brute_force(source_ip: str):
     ]
 
     return len(failed_logins) >= BRUTE_FORCE_THRESHOLD
+
+def create_brute_force_alert(source_ip: str):
+    return SecurityAlert(
+        rule="BRUTE_FORCE_ATTEMPT",
+        source_ip=source_ip,
+        severity="high",
+        message="Possible brute-force attack detected"
+    )
 
 @app.get("/health")
 def health_check():
@@ -64,9 +78,15 @@ def create_security_event(event: SecurityEvent):
 
     brute_force_detected = detect_brute_force(str(event.source_ip))
 
+    alert = None
+
+    if brute_force_detected:
+        alert = create_brute_force_alert(str(event.source_ip))
+
     return {
         "event": created_event,
-        "brute_force_detected": brute_force_detected
+        "brute_force_detected": brute_force_detected,
+        "alert": alert
     }
 
 @app.get("/api/events")

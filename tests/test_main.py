@@ -148,4 +148,11 @@ def test_detect_brute_force():
         )
 
     assert response.status_code == 201
-    assert response.json()["brute_force_detected"] is True   
+    assert response.json()["brute_force_detected"] is True
+    assert response.json()["alert"] is not None
+    assert response.json()["alert"]["rule"] == "BRUTE_FORCE_ATTEMPT"
+    assert response.json()["alert"]["source_ip"] == source_ip
+    assert response.json()["alert"]["severity"] == "high"
+    assert response.json()["alert"]["message"] == "Possible brute-force attack detected"
+    
+      
