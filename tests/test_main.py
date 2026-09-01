@@ -154,5 +154,23 @@ def test_detect_brute_force():
     assert response.json()["alert"]["source_ip"] == source_ip
     assert response.json()["alert"]["severity"] == "high"
     assert response.json()["alert"]["message"] == "Possible brute-force attack detected"
+
+def test_no_brute_force_below_threshold():
+    source_ip = "10.10.10.60"
+
+    for _ in range(4):
+        response = client.post(
+            "/api/events",
+            json={
+                "source_ip": source_ip,
+                "event_type": "failed_login",
+                "severity": "high",
+                "description": "Failed login attempt"
+            }
+        )
+
+    assert response.status_code == 201
+    assert response.json()["brute_force_detected"] is False
+    assert response.json()["alert"] is None
     
       
