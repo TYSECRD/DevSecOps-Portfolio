@@ -22,11 +22,26 @@ def initialize_database():
                 event_type TEXT NOT NULL,
                 severity TEXT NOT NULL,
                 description TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'new',
                 created_at TEXT NOT NULL
             )
             """
         )
 
+        columns = {
+            row["name"]
+            for row in connection.execute(
+                "PRAGMA table_info(security_events)"
+            ).fetchall()
+        }
+
+        if "status" not in columns:
+            connection.execute(
+                """
+                ALTER TABLE security_events
+                ADD COLUMN status TEXT NOT NULL DEFAULT 'new'
+                """
+            )
 
 def create_event(event):
     created_at = datetime.now(timezone.utc).isoformat()
@@ -59,6 +74,7 @@ def create_event(event):
         "event_type": event["event_type"],
         "severity": event["severity"],
         "description": event["description"],
+        "status": "new",
         "created_at": created_at,
     }
 
@@ -85,3 +101,28 @@ def clear_events():
         connection.execute(
             "DELETE FROM sqlite_sequence WHERE name = 'security_events'"
         )
+
+def update_event_status(event_id, status):
+    with get_connection() as connection:
+        cursor = connection.execute(
+            """
+            UPDATE security_events
+            SET status = ?
+            WHERE id = ?
+            """,
+            (status, event_id),
+        )
+
+        if cursor.rowcount == 0:
+            return None
+
+        row = connection.execute(
+            """
+            SELECT *
+            FROM security_events
+            WHERE id = ?
+            """,
+            (event_id,),
+        ).fetchone()
+
+    return dict(row)    

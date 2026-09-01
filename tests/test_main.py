@@ -58,6 +58,7 @@ def test_create_security_event():
     assert data["event_type"] == "failed_login"
     assert data["severity"] == "high"
     assert data["description"] == "Multiple failed login attempts detected"
+    assert data["status"] == "new"
     assert "created_at" in data
     assert data["created_at"].endswith("+00:00")
 

@@ -1,16 +1,27 @@
-from fastapi import FastAPI
-from pydantic import BaseModel, IPvAnyAddress
 from typing import Literal
-from app.database import create_event, initialize_database, read_events
+
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel, IPvAnyAddress
+
+from app.database import (
+    create_event,
+    initialize_database,
+    read_events,
+    update_event_status,
+)
 
 Severity = Literal["low", "medium", "high", "critical"]
-
+EventStatus = Literal["new", "investigating", "resolved"]
 
 class SecurityEvent(BaseModel):
     source_ip: IPvAnyAddress
     event_type: str
     severity: Severity
     description: str
+
+
+class EventStatusUpdate(BaseModel):
+    status: EventStatus
 
 
 app = FastAPI(title="SteelDoor Security API")
@@ -48,3 +59,15 @@ def get_security_events(severity: Severity | None = None):
         "total": len(events),
         "events": events
     }
+
+@app.patch("/api/events/{event_id}")
+def change_event_status(event_id: int, update: EventStatusUpdate):
+    event = update_event_status(event_id, update.status)
+
+    if event is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Security event not found"
+        )
+
+    return event
