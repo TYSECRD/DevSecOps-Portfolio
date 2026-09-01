@@ -1,14 +1,14 @@
 import pytest
 from fastapi.testclient import TestClient
-
-from app.main import app, security_events
+from app.database import clear_events
+from app.main import app
 
 
 @pytest.fixture(autouse=True)
-def clear_security_events():
-    security_events.clear()
+def clear_test_events():
+    clear_events()
     yield
-    security_events.clear()
+    clear_events()
 
 
 client = TestClient(app)

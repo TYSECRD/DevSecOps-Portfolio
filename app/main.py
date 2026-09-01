@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel, IPvAnyAddress
 from typing import Literal
-from datetime import datetime, timezone
+from app.database import create_event, initialize_database, read_events
 
 Severity = Literal["low", "medium", "high", "critical"]
 
@@ -14,7 +14,8 @@ class SecurityEvent(BaseModel):
 
 
 app = FastAPI(title="DevSecOps Portfolio API")
-security_events = []
+initialize_database()
+
 
 
 @app.get("/health")
@@ -37,24 +38,13 @@ def greet(name: str):
 
 @app.post("/api/events", status_code=201)
 def create_security_event(event: SecurityEvent):
-    event_record = event.model_dump()
-    event_record["id"] = len(security_events) + 1
-    event_record["created_at"] = datetime.now(timezone.utc).isoformat()
-    security_events.append(event_record)
-
-    return event_record
+    return create_event(event.model_dump())
 
 @app.get("/api/events")
 def get_security_events(severity: Severity | None = None):
-    filtered_events = security_events
-
-    if severity is not None:
-        filtered_events = [
-            event for event in security_events
-            if event["severity"] == severity
-        ]
+    events = read_events(severity)
 
     return {
-        "total": len(filtered_events),
-        "events": filtered_events
+        "total": len(events),
+        "events": events
     }
