@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="assets/steeldoor-banner.svg" alt="SteelDoor Security Event Defense Platform" width="100%">
-</p>
+![SteelDoor Security Event Defense Platform](./assets/steeldoor-banner.svg)
 
 # SteelDoor Security API
 
