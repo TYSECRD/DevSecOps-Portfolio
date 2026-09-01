@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from pydantic import BaseModel, IPvAnyAddress
 from typing import Literal
+from datetime import datetime, timezone
 
 Severity = Literal["low", "medium", "high", "critical"]
 
@@ -38,6 +39,7 @@ def greet(name: str):
 def create_security_event(event: SecurityEvent):
     event_record = event.model_dump()
     event_record["id"] = len(security_events) + 1
+    event_record["created_at"] = datetime.now(timezone.utc).isoformat()
     security_events.append(event_record)
 
     return event_record
