@@ -2,11 +2,13 @@ from fastapi import FastAPI
 from pydantic import BaseModel, IPvAnyAddress
 from typing import Literal
 
+Severity = Literal["low", "medium", "high", "critical"]
+
 
 class SecurityEvent(BaseModel):
     source_ip: IPvAnyAddress
     event_type: str
-    severity: Literal["low", "medium", "high", "critical"]
+    severity: Severity
     description: str
 
 
@@ -41,8 +43,16 @@ def create_security_event(event: SecurityEvent):
     return event_record
 
 @app.get("/api/events")
-def get_security_events():
+def get_security_events(severity: Severity | None = None):
+    filtered_events = security_events
+
+    if severity is not None:
+        filtered_events = [
+            event for event in security_events
+            if event["severity"] == severity
+        ]
+
     return {
-        "total": len(security_events),
-        "events": security_events
+        "total": len(filtered_events),
+        "events": filtered_events
     }

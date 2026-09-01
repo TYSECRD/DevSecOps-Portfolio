@@ -94,3 +94,28 @@ def test_reject_invalid_ip_address():
     response = client.post("/api/events", json=event)
 
     assert response.status_code == 422
+
+def test_filter_events_by_severity():
+    critical_event = {
+        "source_ip": "203.0.113.10",
+        "event_type": "ransomware_detected",
+        "severity": "critical",
+        "description": "Potential ransomware activity detected"
+    }
+
+    client.post("/api/events", json=critical_event)
+    response = client.get("/api/events?severity=critical")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["total"] >= 1
+    assert all(
+        event["severity"] == "critical"
+        for event in data["events"]
+    )
+    assert any(
+        event["event_type"] == "ransomware_detected"
+        for event in data["events"]
+    )
