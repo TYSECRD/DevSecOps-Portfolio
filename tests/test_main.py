@@ -2,6 +2,8 @@ import pytest
 from fastapi.testclient import TestClient
 from app.database import clear_events
 from app.main import app
+from datetime import datetime, timedelta, timezone
+from app.database import create_event
 
 
 @pytest.fixture(autouse=True)
@@ -168,6 +170,38 @@ def test_no_brute_force_below_threshold():
                 "description": "Failed login attempt"
             }
         )
+
+    assert response.status_code == 201
+    assert response.json()["brute_force_detected"] is False
+    assert response.json()["alert"] is None
+
+def test_old_failed_logins_do_not_trigger_brute_force():
+    source_ip = "10.10.10.70"
+
+    old_time = (
+        datetime.now(timezone.utc) - timedelta(minutes=10)
+    ).isoformat()
+
+    for _ in range(5):
+        create_event(
+            {
+                "source_ip": source_ip,
+                "event_type": "failed_login",
+                "severity": "high",
+                "description": "Old failed login attempt"
+            },
+            created_at=old_time
+        )
+
+    response = client.post(
+        "/api/events",
+        json={
+            "source_ip": source_ip,
+            "event_type": "login_success",
+            "severity": "low",
+            "description": "Successful login"
+        }
+    )
 
     assert response.status_code == 201
     assert response.json()["brute_force_detected"] is False

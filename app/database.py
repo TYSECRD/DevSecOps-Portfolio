@@ -43,8 +43,9 @@ def initialize_database():
                 """
             )
 
-def create_event(event):
-    created_at = datetime.now(timezone.utc).isoformat()
+def create_event(event, created_at=None):
+    if created_at is None:
+        created_at = datetime.now(timezone.utc).isoformat()
     source_ip = str(event["source_ip"])
 
     with get_connection() as connection:
