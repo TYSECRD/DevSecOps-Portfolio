@@ -13,7 +13,7 @@ class SecurityEvent(BaseModel):
     description: str
 
 
-app = FastAPI(title="DevSecOps Portfolio API")
+app = FastAPI(title="SteelDoor Security API")
 initialize_database()
 
 
@@ -26,7 +26,7 @@ def health_check():
 @app.get("/api/info")
 def app_info():
     return {
-        "name": "DevSecOps Portfolio API",
+        "name": "SteelDoor Security API",
         "version": "1.0.0",
         "environment": "development"
     }

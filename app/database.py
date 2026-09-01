@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 
-DATABASE_PATH = Path(__file__).resolve().parent.parent / "sentinelforge.db"
+DATABASE_PATH = Path(__file__).resolve().parent.parent / "steeldoor.db"
 
 
 def get_connection():

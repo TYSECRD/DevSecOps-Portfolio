@@ -28,7 +28,7 @@ def test_app_info():
 
     data = response.json()
 
-    assert data["name"] == "DevSecOps Portfolio API"
+    assert data["name"] == "SteelDoor Security API"
     assert data["version"] == "1.0.0"
     assert data["environment"] == "development"
 
