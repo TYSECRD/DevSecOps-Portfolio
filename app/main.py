@@ -38,3 +38,10 @@ def create_security_event(event: SecurityEvent):
     security_events.append(event_record)
 
     return event_record
+
+@app.get("/api/events")
+def get_security_events():
+    return {
+        "total": len(security_events),
+        "events": security_events
+    }

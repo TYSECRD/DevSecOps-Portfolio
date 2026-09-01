@@ -50,3 +50,23 @@ def test_create_security_event():
     assert data["event_type"] == "failed_login"
     assert data["severity"] == "high"
     assert data["description"] == "Multiple failed login attempts detected"
+
+def test_get_security_events():
+    event = {
+        "source_ip": "10.0.0.25",
+        "event_type": "malware_detected",
+        "severity": "critical",
+        "description": "Suspicious executable detected"
+    }
+
+    client.post("/api/events", json=event)
+    response = client.get("/api/events")
+
+    assert response.status_code == 200
+
+    data = response.json()
+
+    assert data["total"] >= 1
+    assert isinstance(data["events"], list)
+    assert data["events"][-1]["event_type"] == "malware_detected"
+    assert data["events"][-1]["severity"] == "critical"
