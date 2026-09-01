@@ -13,6 +13,8 @@ from app.database import (
 Severity = Literal["low", "medium", "high", "critical"]
 EventStatus = Literal["new", "investigating", "resolved"]
 
+BRUTE_FORCE_THRESHOLD = 5
+
 class SecurityEvent(BaseModel):
     source_ip: IPvAnyAddress
     event_type: str
@@ -27,7 +29,16 @@ class EventStatusUpdate(BaseModel):
 app = FastAPI(title="SteelDoor Security API")
 initialize_database()
 
+def detect_brute_force(source_ip: str):
+    events = read_events()
 
+    failed_logins = [
+        event for event in events
+        if event["event_type"] == "failed_login"
+        and event["source_ip"] == source_ip
+    ]
+
+    return len(failed_logins) >= BRUTE_FORCE_THRESHOLD
 
 @app.get("/health")
 def health_check():
@@ -49,7 +60,14 @@ def greet(name: str):
 
 @app.post("/api/events", status_code=201)
 def create_security_event(event: SecurityEvent):
-    return create_event(event.model_dump())
+    created_event = create_event(event.model_dump())
+
+    brute_force_detected = detect_brute_force(str(event.source_ip))
+
+    return {
+        "event": created_event,
+        "brute_force_detected": brute_force_detected
+    }
 
 @app.get("/api/events")
 def get_security_events(severity: Severity | None = None):

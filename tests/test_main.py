@@ -53,14 +53,14 @@ def test_create_security_event():
 
     data = response.json()
 
-    assert data["id"] == 1
-    assert data["source_ip"] == "192.168.1.50"
-    assert data["event_type"] == "failed_login"
-    assert data["severity"] == "high"
-    assert data["description"] == "Multiple failed login attempts detected"
-    assert data["status"] == "new"
-    assert "created_at" in data
-    assert data["created_at"].endswith("+00:00")
+    assert data["event"]["id"] == 1
+    assert data["event"]["source_ip"] == "192.168.1.50"
+    assert data["event"]["event_type"] == "failed_login"
+    assert data["event"]["severity"] == "high"
+    assert data["event"]["description"] == "Multiple failed login attempts detected"
+    assert data["event"]["status"] == "new"
+    assert "created_at" in data["event"]
+    assert data["event"]["created_at"].endswith("+00:00")
 
 
 
@@ -132,3 +132,20 @@ def test_filter_events_by_severity():
         event["event_type"] == "ransomware_detected"
         for event in data["events"]
     )
+
+def test_detect_brute_force():
+    source_ip = "10.10.10.50"
+
+    for _ in range(5):
+        response = client.post(
+            "/api/events",
+            json={
+                "source_ip": source_ip,
+                "event_type": "failed_login",
+                "severity": "high",
+                "description": "Failed login attempt"
+            }
+        )
+
+    assert response.status_code == 201
+    assert response.json()["brute_force_detected"] is True   
