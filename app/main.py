@@ -1,6 +1,8 @@
+import os
 from typing import Literal
 from app.detection import detect_brute_force
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Security
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, IPvAnyAddress
 
 from app.database import (
@@ -33,6 +35,23 @@ class SecurityAlert(BaseModel):
 app = FastAPI(title="SteelDoor Security API")
 initialize_database()
 
+API_KEY = os.getenv("STEELDOOR_API_KEY")
+
+api_key_header = APIKeyHeader(
+    name="X-API-Key",
+    auto_error=False
+)
+
+
+def verify_api_key(api_key: str = Security(api_key_header)):
+    if not API_KEY or api_key != API_KEY:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing API key"
+        )
+
+    return api_key
+
 def create_brute_force_alert(source_ip: str):
     return SecurityAlert(
         rule="BRUTE_FORCE_ATTEMPT",
@@ -60,7 +79,10 @@ def greet(name: str):
     return {"message": f"Hello, {name}!"}
 
 @app.post("/api/events", status_code=201)
-def create_security_event(event: SecurityEvent):
+def create_security_event(
+    event: SecurityEvent,
+    api_key: str = Security(verify_api_key)
+):
     created_event = create_event(event.model_dump())
 
     brute_force_detected = detect_brute_force(str(event.source_ip))
@@ -77,7 +99,10 @@ def create_security_event(event: SecurityEvent):
     }
 
 @app.get("/api/events")
-def get_security_events(severity: Severity | None = None):
+def get_security_events(
+    severity: Severity | None = None,
+    api_key: str = Security(verify_api_key)
+):
     events = read_events(severity)
 
     return {
@@ -86,7 +111,11 @@ def get_security_events(severity: Severity | None = None):
     }
 
 @app.patch("/api/events/{event_id}")
-def change_event_status(event_id: int, update: EventStatusUpdate):
+def change_event_status(
+    event_id: int,
+    update: EventStatusUpdate,
+    api_key: str = Security(verify_api_key)
+):
     event = update_event_status(event_id, update.status)
 
     if event is None:

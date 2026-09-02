@@ -1,9 +1,17 @@
 import pytest
-from fastapi.testclient import TestClient
-from app.database import clear_events
-from app.main import app
 from datetime import datetime, timedelta, timezone
-from app.database import create_event
+from fastapi.testclient import TestClient
+from app.database import clear_events, create_event
+import os
+os.environ["STEELDOOR_API_KEY"] = "steeldoor-dev-key"
+from app.main import app
+
+
+client = TestClient(app)
+
+API_HEADERS = {
+    "X-API-Key": "steeldoor-dev-key"
+}
 
 
 @pytest.fixture(autouse=True)
@@ -11,9 +19,6 @@ def clear_test_events():
     clear_events()
     yield
     clear_events()
-
-
-client = TestClient(app)
 
 
 def test_health():
@@ -41,6 +46,7 @@ def test_greet():
     assert response.status_code == 200
     assert response.json() == {"message": "Hello, Ty!"}
 
+
 def test_create_security_event():
     event = {
         "source_ip": "192.168.1.50",
@@ -49,7 +55,11 @@ def test_create_security_event():
         "description": "Multiple failed login attempts detected"
     }
 
-    response = client.post("/api/events", json=event)
+    response = client.post(
+        "/api/events",
+        json=event,
+        headers=API_HEADERS
+    )
 
     assert response.status_code == 201
 
@@ -65,7 +75,6 @@ def test_create_security_event():
     assert data["event"]["created_at"].endswith("+00:00")
 
 
-
 def test_get_security_events():
     event = {
         "source_ip": "10.0.0.25",
@@ -74,8 +83,16 @@ def test_get_security_events():
         "description": "Suspicious executable detected"
     }
 
-    client.post("/api/events", json=event)
-    response = client.get("/api/events")
+    client.post(
+        "/api/events",
+        json=event,
+        headers=API_HEADERS
+    )
+
+    response = client.get(
+        "/api/events",
+        headers=API_HEADERS
+    )
 
     assert response.status_code == 200
 
@@ -86,6 +103,7 @@ def test_get_security_events():
     assert data["events"][-1]["event_type"] == "malware_detected"
     assert data["events"][-1]["severity"] == "critical"
 
+
 def test_reject_invalid_severity():
     event = {
         "source_ip": "172.16.0.10",
@@ -94,9 +112,14 @@ def test_reject_invalid_severity():
         "description": "Invalid severity test"
     }
 
-    response = client.post("/api/events", json=event)
+    response = client.post(
+        "/api/events",
+        json=event,
+        headers=API_HEADERS
+    )
 
     assert response.status_code == 422
+
 
 def test_reject_invalid_ip_address():
     event = {
@@ -106,9 +129,14 @@ def test_reject_invalid_ip_address():
         "description": "Invalid IP address test"
     }
 
-    response = client.post("/api/events", json=event)
+    response = client.post(
+        "/api/events",
+        json=event,
+        headers=API_HEADERS
+    )
 
     assert response.status_code == 422
+
 
 def test_filter_events_by_severity():
     critical_event = {
@@ -118,8 +146,16 @@ def test_filter_events_by_severity():
         "description": "Potential ransomware activity detected"
     }
 
-    client.post("/api/events", json=critical_event)
-    response = client.get("/api/events?severity=critical")
+    client.post(
+        "/api/events",
+        json=critical_event,
+        headers=API_HEADERS
+    )
+
+    response = client.get(
+        "/api/events?severity=critical",
+        headers=API_HEADERS
+    )
 
     assert response.status_code == 200
 
@@ -135,6 +171,7 @@ def test_filter_events_by_severity():
         for event in data["events"]
     )
 
+
 def test_detect_brute_force():
     source_ip = "10.10.10.50"
 
@@ -146,7 +183,8 @@ def test_detect_brute_force():
                 "event_type": "failed_login",
                 "severity": "high",
                 "description": "Failed login attempt"
-            }
+            },
+            headers=API_HEADERS
         )
 
     assert response.status_code == 201
@@ -156,6 +194,7 @@ def test_detect_brute_force():
     assert response.json()["alert"]["source_ip"] == source_ip
     assert response.json()["alert"]["severity"] == "high"
     assert response.json()["alert"]["message"] == "Possible brute-force attack detected"
+
 
 def test_no_brute_force_below_threshold():
     source_ip = "10.10.10.60"
@@ -168,12 +207,14 @@ def test_no_brute_force_below_threshold():
                 "event_type": "failed_login",
                 "severity": "high",
                 "description": "Failed login attempt"
-            }
+            },
+            headers=API_HEADERS
         )
 
     assert response.status_code == 201
     assert response.json()["brute_force_detected"] is False
     assert response.json()["alert"] is None
+
 
 def test_old_failed_logins_do_not_trigger_brute_force():
     source_ip = "10.10.10.70"
@@ -200,11 +241,14 @@ def test_old_failed_logins_do_not_trigger_brute_force():
             "event_type": "login_success",
             "severity": "low",
             "description": "Successful login"
-        }
+        },
+        headers=API_HEADERS
     )
 
     assert response.status_code == 201
     assert response.json()["brute_force_detected"] is False
     assert response.json()["alert"] is None
-    
-      
+
+def test_reject_missing_api_key():
+    response = client.get("/api/events")
+    assert response.status_code == 401
