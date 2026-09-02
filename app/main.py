@@ -1,11 +1,12 @@
 import secrets
 import os
 from typing import Literal
-from app.detection import detect_brute_force
 from fastapi import FastAPI, HTTPException, Security, Request
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, IPvAnyAddress
+from app.detection import detect_brute_force
 from app.rate_limit import check_rate_limit, WINDOW_SECONDS
+from app.security_logger import log_security_event
 
 from app.database import (
     create_event,
@@ -48,20 +49,32 @@ def verify_api_key(
     request: Request,
     api_key: str = Security(api_key_header)
 ):
+    client_ip = request.client.host if request.client else "unknown"
+
     if not API_KEY or not api_key or not secrets.compare_digest(api_key, API_KEY):
+        log_security_event(
+            event_type="invalid_api_key",
+            message="Invalid or missing API key",
+            client_ip=client_ip
+        )
+
         raise HTTPException(
             status_code=401,
             detail="Invalid or missing API key"
         )
 
-    client_id = request.client.host if request.client else "unknown"
-
-    if not check_rate_limit(client_id):
+    if not check_rate_limit(client_ip):
+        log_security_event(
+            event_type="rate_limit_exceeded",
+            message="Client exceeded request limit",
+            client_ip=client_ip
+        )
         raise HTTPException(
-        status_code=429,
-        detail="Too many requests",
-        headers={"Retry-After": str(WINDOW_SECONDS)}
-    )
+            status_code=429,
+            detail="Too many requests",
+            headers={"Retry-After": str(WINDOW_SECONDS)}
+        )
+
     return api_key
 
 def create_brute_force_alert(source_ip: str):
@@ -103,6 +116,12 @@ def create_security_event(
 
     if brute_force_detected:
         alert = create_brute_force_alert(str(event.source_ip))
+
+    log_security_event(
+        event_type="brute_force_detected",
+        message="Possible brute-force attack detected",
+        client_ip=str(event.source_ip)
+    )
 
     return {
         "event": created_event,

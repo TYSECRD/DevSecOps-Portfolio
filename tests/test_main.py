@@ -282,3 +282,13 @@ def test_rate_limit_exceeded():
     assert response.status_code == 429
     assert response.json()["detail"] == "Too many requests"
     assert response.headers["Retry-After"] == str(WINDOW_SECONDS)
+
+def test_invalid_api_key_is_logged(caplog):
+    response = client.get(
+        "/api/events",
+        headers={"X-API-Key": "wrong-key"}
+    )
+
+    assert response.status_code == 401
+    assert "invalid_api_key" in caplog.text
+    assert "Invalid or missing API key" in caplog.text
