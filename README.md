@@ -1,10 +1,6 @@
 ![SteelDoor Security Event Defense Platform](./assets/steeldoor-banner.svg)
 
-# SteelDoor Security API
-
 [![CI Pipeline](https://github.com/TYSECRD/DevSecOps-Portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/TYSECRD/DevSecOps-Portfolio/actions/workflows/ci.yml)
-
-**Security events hit the door. Threats don't get through.**
 
 SteelDoor is a Python-based security-event monitoring and threat-detection API built to demonstrate secure application development, automated detection, authentication, rate limiting, security logging, database persistence, container security, automated testing, and DevSecOps pipeline controls.
 
