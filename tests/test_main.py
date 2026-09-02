@@ -5,7 +5,7 @@ from app.database import clear_events, create_event
 import os
 os.environ["STEELDOOR_API_KEY"] = "steeldoor-dev-key"
 from app.main import app
-from app.rate_limit import clear_rate_limits, REQUEST_LIMIT
+from app.rate_limit import clear_rate_limits, REQUEST_LIMIT, WINDOW_SECONDS
 
 
 client = TestClient(app)
@@ -266,30 +266,19 @@ def test_reject_invalid_api_key():
     assert response.status_code == 401
 
 def test_rate_limit_exceeded():
-    source_ip = "10.10.10.80"
-
     for _ in range(REQUEST_LIMIT):
-        response = client.post(
+        response = client.get(
             "/api/events",
-            json={
-                "source_ip": source_ip,
-                "event_type": "failed_login",
-                "severity": "high",
-                "description": "Failed login attempt"
-            },
             headers=API_HEADERS
         )
-        assert response.status_code == 201
 
-    response = client.post(
+        assert response.status_code == 200
+
+    response = client.get(
         "/api/events",
-        json={
-            "source_ip": source_ip,
-            "event_type": "failed_login",
-            "severity": "high",
-            "description": "Failed login attempt"
-        },
         headers=API_HEADERS
     )
 
     assert response.status_code == 429
+    assert response.json()["detail"] == "Too many requests"
+    assert response.headers["Retry-After"] == str(WINDOW_SECONDS)

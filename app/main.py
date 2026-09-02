@@ -5,7 +5,7 @@ from app.detection import detect_brute_force
 from fastapi import FastAPI, HTTPException, Security, Request
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, IPvAnyAddress
-from app.rate_limit import check_rate_limit
+from app.rate_limit import check_rate_limit, WINDOW_SECONDS
 
 from app.database import (
     create_event,
@@ -44,7 +44,6 @@ api_key_header = APIKeyHeader(
     auto_error=False
 )
 
-
 def verify_api_key(
     request: Request,
     api_key: str = Security(api_key_header)
@@ -59,10 +58,10 @@ def verify_api_key(
 
     if not check_rate_limit(client_id):
         raise HTTPException(
-            status_code=429,
-            detail="Too many requests"
-        )
-
+        status_code=429,
+        detail="Too many requests",
+        headers={"Retry-After": str(WINDOW_SECONDS)}
+    )
     return api_key
 
 def create_brute_force_alert(source_ip: str):
