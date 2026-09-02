@@ -5,6 +5,7 @@ from app.database import clear_events, create_event
 import os
 os.environ["STEELDOOR_API_KEY"] = "steeldoor-dev-key"
 from app.main import app
+from app.rate_limit import clear_rate_limits, REQUEST_LIMIT
 
 
 client = TestClient(app)
@@ -17,9 +18,12 @@ API_HEADERS = {
 @pytest.fixture(autouse=True)
 def clear_test_events():
     clear_events()
-    yield
-    clear_events()
+    clear_rate_limits()
 
+    yield
+
+    clear_events()
+    clear_rate_limits()
 
 def test_health():
     response = client.get("/health")
@@ -252,3 +256,40 @@ def test_old_failed_logins_do_not_trigger_brute_force():
 def test_reject_missing_api_key():
     response = client.get("/api/events")
     assert response.status_code == 401
+
+def test_reject_invalid_api_key():
+    response = client.get(
+        "/api/events",
+        headers={"X-API-Key": "wrong-key"}
+    )
+
+    assert response.status_code == 401
+
+def test_rate_limit_exceeded():
+    source_ip = "10.10.10.80"
+
+    for _ in range(REQUEST_LIMIT):
+        response = client.post(
+            "/api/events",
+            json={
+                "source_ip": source_ip,
+                "event_type": "failed_login",
+                "severity": "high",
+                "description": "Failed login attempt"
+            },
+            headers=API_HEADERS
+        )
+        assert response.status_code == 201
+
+    response = client.post(
+        "/api/events",
+        json={
+            "source_ip": source_ip,
+            "event_type": "failed_login",
+            "severity": "high",
+            "description": "Failed login attempt"
+        },
+        headers=API_HEADERS
+    )
+
+    assert response.status_code == 429

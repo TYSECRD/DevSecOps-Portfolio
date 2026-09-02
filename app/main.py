@@ -1,9 +1,11 @@
+import secrets
 import os
 from typing import Literal
 from app.detection import detect_brute_force
-from fastapi import FastAPI, HTTPException, Security
+from fastapi import FastAPI, HTTPException, Security, Request
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, IPvAnyAddress
+from app.rate_limit import check_rate_limit
 
 from app.database import (
     create_event,
@@ -43,11 +45,22 @@ api_key_header = APIKeyHeader(
 )
 
 
-def verify_api_key(api_key: str = Security(api_key_header)):
-    if not API_KEY or api_key != API_KEY:
+def verify_api_key(
+    request: Request,
+    api_key: str = Security(api_key_header)
+):
+    if not API_KEY or not api_key or not secrets.compare_digest(api_key, API_KEY):
         raise HTTPException(
             status_code=401,
             detail="Invalid or missing API key"
+        )
+
+    client_id = request.client.host if request.client else "unknown"
+
+    if not check_rate_limit(client_id):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many requests"
         )
 
     return api_key
