@@ -31,3 +31,15 @@ jobs:
 
       - name: Run tests
         run: python -m pytest
+
+      - name: Build SteelDoor Docker image
+        run: docker build -t steeldoor:ci .
+
+      - name: Scan SteelDoor Docker image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: steeldoor:ci
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
