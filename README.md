@@ -2,107 +2,91 @@
 
 [![CI Pipeline](https://github.com/TYSECRD/DevSecOps-Portfolio/actions/workflows/ci.yml/badge.svg)](https://github.com/TYSECRD/DevSecOps-Portfolio/actions/workflows/ci.yml)
 
-SteelDoor is a Python-based security-event monitoring and threat-detection API built to demonstrate secure application development, automated detection, authentication, rate limiting, security logging, database persistence, container security, automated testing, and DevSecOps pipeline controls.
+**SteelDoor** is a Python-based security-event monitoring and threat-detection API built as a hands-on DevSecOps portfolio project.
+
+The project demonstrates secure API development, authentication, rate limiting, automated threat detection, structured security logging, persistent storage, container hardening, vulnerability management, automated testing, and CI security controls.
+
+SteelDoor v1 is designed to show not only how an application can be built, but how security can be integrated throughout the development and deployment lifecycle.
 
 ---
 
-## Current Features
+## Project Goals
+
+SteelDoor was built to practice and demonstrate core DevSecOps concepts in one working application:
+
+* Build a REST API with FastAPI
+* Validate and store security-event data
+* Detect suspicious authentication activity
+* Protect API endpoints
+* Apply rate limiting
+* Produce security logs and alerts
+* Write automated tests
+* Scan source code and dependencies
+* Package the application with Docker
+* Harden the container runtime
+* Persist application data outside disposable containers
+* Scan the finished container image
+* Automatically repeat security checks through CI
+
+---
+
+# Current Features
+
+## Security Event API
+
+SteelDoor can:
 
 * Ingest security events through a REST API
 * Validate IPv4 and IPv6 source addresses
 * Enforce approved severity levels
 * Assign unique event IDs
 * Record UTC timestamps
-* Store security events in SQLite
-* Retrieve recorded security events
+* Store events in SQLite
+* Retrieve recorded events
 * Filter events by severity
-* Track event status through `new`, `investigating`, and `resolved`
-* Detect repeated failed-login activity
-* Detect brute-force behavior using a 5-attempt / 5-minute threshold
-* Generate structured security alerts
-* Ignore expired failed-login activity outside the detection window
-* Reject malformed security data
-* Interactive Swagger API documentation
-* API-key authentication on protected endpoints
-* Environment-based secret configuration
-* Constant-time API-key comparison with `secrets.compare_digest()`
-* Per-client API rate limiting
-* `429 Too Many Requests` responses
-* `Retry-After` response headers
-* Security audit logging
-* Invalid authentication-attempt logging
-* Rate-limit violation logging
-* Brute-force detection logging
-* Docker containerization
-* Non-root container execution
-* Runtime secret injection
-* Hardened Docker build context with `.dockerignore`
-* Container vulnerability scanning with Docker Scout
+* Track investigation status
+* Reject malformed event data
 
----
-
-## Security Architecture
-
-Protected SteelDoor requests pass through multiple security controls before application logic is executed.
+Supported event statuses:
 
 ```text
-Client Request
-      |
-      v
-API-Key Authentication
-      |
-      v
-Constant-Time Secret Validation
-      |
-      v
-Client Rate Limiting
-      |
-      v
-FastAPI Endpoint
-      |
-      v
-Input Validation
-      |
-      v
-Detection Engine
-      |
-      v
-SQLite Persistence
-      |
-      +----> Security Logging
-      |
-      +----> Structured Alerts
+new
+investigating
+resolved
 ```
 
-SteelDoor applies defense-in-depth rather than relying on a single security control.
+Supported severity levels:
+
+```text
+low
+medium
+high
+critical
+```
 
 ---
 
-## Authentication
+## API-Key Authentication
 
-Protected endpoints require an API key supplied through the HTTP header:
+Protected SteelDoor endpoints require an API key supplied through:
 
 ```text
 X-API-Key
 ```
 
-SteelDoor does not hardcode its runtime API key in application source code.
-
-The application reads the key from the environment variable:
+The runtime key is loaded from:
 
 ```text
 STEELDOOR_API_KEY
 ```
 
-Authentication logic also rejects requests when the server-side secret is missing.
+The key is not hard-coded into the application source code or Docker image.
 
-Secret values are compared using Python's:
+Sensitive values are compared using:
 
 ```python
 secrets.compare_digest()
 ```
-
-This provides a safer comparison method for sensitive values.
 
 Missing or invalid credentials return:
 
@@ -110,11 +94,13 @@ Missing or invalid credentials return:
 401 Unauthorized
 ```
 
+SteelDoor also fails closed when the server-side API key is missing.
+
 ---
 
 ## Rate Limiting
 
-SteelDoor includes an in-memory rate limiter to reduce excessive API requests.
+SteelDoor contains an in-memory per-client rate limiter.
 
 Current policy:
 
@@ -124,76 +110,50 @@ per 60-second window
 per client
 ```
 
-When the limit is exceeded, SteelDoor returns:
+Clients exceeding the limit receive:
 
 ```text
 429 Too Many Requests
 ```
 
-along with:
+with:
 
 ```text
 Retry-After: 60
 ```
 
-The rate limiter is intentionally lightweight for the current project stage. A distributed implementation could later use infrastructure such as Redis.
+This implementation is intentionally lightweight for SteelDoor v1.
+
+A production distributed deployment could move rate-limit state to a shared system such as Redis.
 
 ---
 
-## Security Logging
+# Threat Detection
 
-SteelDoor includes a dedicated security logging module.
+## Brute-Force Detection
 
-Security events currently logged include:
+SteelDoor analyzes failed-login security events for repeated authentication attempts.
 
-* Invalid or missing API-key attempts
-* Rate-limit violations
-* Brute-force detections
-
-Logs include useful security context such as:
+Current detection rule:
 
 ```text
-timestamp
-event type
-client IP
-security message
+5 failed-login events
+from the same source IP
+within 5 minutes
 ```
 
-Example:
+Activity outside the detection window is excluded.
 
 ```text
-timestamp=2026-09-02T22:46:10+00:00 event=invalid_api_key client_ip=127.0.0.1 message=Invalid or missing API key
-```
-
-Automated tests verify that security logging is actually triggered.
-
----
-
-## Detection Engine
-
-SteelDoor includes a dedicated detection module for analyzing security-event activity.
-
-The first implemented detection rule identifies potential brute-force authentication attacks.
-
-### Brute-Force Rule
-
-SteelDoor generates an alert when:
-
-* The same source IP generates at least 5 failed-login events
-* Those events occur within a 5-minute window
-
-Activity outside the detection window is excluded from the threshold.
-
-```text
-Failed login
+Failed Login
      |
-Failed login
+Failed Login
      |
-Failed login
+Failed Login
      |
-Failed login
+Failed Login
      |
-Failed login
+Failed Login
      |
      v
 SteelDoor Detection Engine
@@ -203,11 +163,7 @@ BRUTE_FORCE_ATTEMPT
 Severity: HIGH
 ```
 
----
-
-## Structured Alerts
-
-When the brute-force rule is triggered, SteelDoor generates a structured alert.
+When the rule triggers, SteelDoor generates a structured alert similar to:
 
 ```json
 {
@@ -222,52 +178,111 @@ This separates raw security-event ingestion from detection results.
 
 ---
 
-## DevSecOps Controls
+# Security Logging
 
-Every push to GitHub automatically runs:
+SteelDoor includes dedicated security logging for security-relevant application activity.
 
-* Pytest automated testing
-* Bandit static application security testing (SAST)
-* Pip-audit dependency vulnerability scanning
-* GitHub Actions continuous integration
+Examples include:
 
-The automated test suite currently contains:
+* Invalid or missing API-key attempts
+* Rate-limit violations
+* Detection activity
+
+Security logs can include:
 
 ```text
-15 passing tests
+timestamp
+event type
+client IP
+security message
 ```
 
-Coverage includes:
+Example:
 
-* Health endpoint behavior
-* Application information
-* API greeting
-* Event ingestion
-* Event retrieval
-* Severity validation
-* IP-address validation
-* Severity filtering
-* Event status updates
-* Brute-force detection
-* Detection thresholds
-* Detection-window expiration
-* Missing API-key rejection
-* Invalid API-key rejection
-* Rate-limit enforcement
-* `Retry-After` behavior
-* Security logging
+```text
+timestamp=2026-09-02T22:46:10+00:00
+event=invalid_api_key
+client_ip=127.0.0.1
+message=Invalid or missing API key
+```
+
+Automated tests verify that invalid authentication attempts generate security logs.
 
 ---
 
-## Container Security
+# Security Architecture
 
-SteelDoor is packaged as a Docker image using:
+Protected requests pass through multiple controls before reaching application logic.
+
+```text
+Client Request
+      |
+      v
+API-Key Authentication
+      |
+      v
+Constant-Time Secret Validation
+      |
+      v
+Per-Client Rate Limiting
+      |
+      v
+FastAPI Endpoint
+      |
+      v
+Pydantic Input Validation
+      |
+      v
+Detection Engine
+      |
+      v
+SQLite Persistence
+      |
+      +------> Security Logging
+      |
+      +------> Structured Alerts
+```
+
+SteelDoor uses **defense in depth** rather than depending on a single security control.
+
+---
+
+# Container Architecture
+
+SteelDoor is packaged with Docker using:
 
 ```text
 python:3.13-slim
 ```
 
-The container is hardened to run as a dedicated non-root Linux user:
+The application is designed so the container itself can be disposable while application data survives separately.
+
+```text
+Host
+ |
+ +-- Docker
+      |
+      +-- SteelDoor Container
+      |     |
+      |     +-- FastAPI
+      |     +-- Detection Engine
+      |     +-- Security Controls
+      |     +-- Read-Only Application Filesystem
+      |
+      +-- Persistent Docker Volume
+            |
+            +-- steeldoor.db
+```
+
+---
+
+# Docker Security Hardening
+
+SteelDoor's container runtime is hardened using several independent controls.
+
+## Non-Root Execution
+
+The application runs as a dedicated Linux user:
 
 ```text
 steeldoor
@@ -276,18 +291,250 @@ steeldoor
 Runtime verification:
 
 ```bash
-docker exec steeldoor whoami
+docker exec steeldoor id
 ```
 
 Expected result:
 
 ```text
-steeldoor
+uid=1000(steeldoor)
+gid=1000(steeldoor)
 ```
 
-This reduces the potential impact of an application compromise inside the container.
+The application does not run as:
 
-The Docker build context also excludes unnecessary or sensitive files through `.dockerignore`, including:
+```text
+uid=0(root)
+```
+
+This applies the principle of least privilege.
+
+---
+
+## Linux Capabilities
+
+All additional Linux capabilities are removed:
+
+```yaml
+cap_drop:
+  - ALL
+```
+
+This limits the privileges available to a compromised application process.
+
+---
+
+## Privilege Escalation Protection
+
+The runtime also uses:
+
+```yaml
+security_opt:
+  - no-new-privileges:true
+```
+
+This prevents processes inside the container from gaining additional privileges.
+
+---
+
+## Read-Only Application Filesystem
+
+The main container filesystem runs read-only:
+
+```yaml
+read_only: true
+```
+
+Runtime verification:
+
+```bash
+docker exec steeldoor sh -c "touch /app/test.txt"
+```
+
+Expected result:
+
+```text
+Read-only file system
+```
+
+This reduces an attacker's ability to modify application files after compromising the service.
+
+---
+
+## Writable Data Isolation
+
+The application database is stored separately at:
+
+```text
+/app/data/steeldoor.db
+```
+
+The database directory remains writable through a Docker volume while the main application filesystem remains read-only.
+
+```text
+/app         -> read only
+/app/data    -> writable persistent volume
+/tmp         -> temporary writable filesystem
+```
+
+---
+
+## Temporary Filesystem
+
+SteelDoor provides an in-memory temporary filesystem:
+
+```yaml
+tmpfs:
+  - /tmp
+```
+
+Applications can use temporary storage without requiring the primary container filesystem to become writable.
+
+---
+
+# Persistent Storage
+
+SteelDoor supports a configurable database path through:
+
+```text
+STEELDOOR_DATABASE_PATH
+```
+
+The Compose deployment uses:
+
+```text
+/app/data/steeldoor.db
+```
+
+with a named Docker volume:
+
+```yaml
+volumes:
+  - steeldoor_data:/app/data
+```
+
+This allows the SteelDoor container to be destroyed and recreated without losing stored security events.
+
+Persistence was verified by:
+
+```text
+Create security event
+        |
+        v
+Destroy SteelDoor container
+        |
+        v
+Create new SteelDoor container
+        |
+        v
+Retrieve original event successfully
+```
+
+Containers are disposable.
+
+Security-event data is not.
+
+---
+
+# Runtime Resource Limits
+
+SteelDoor limits the resources available to the container.
+
+Current limits:
+
+```text
+CPU       1 core
+Memory    512 MB
+Processes 100
+```
+
+Compose configuration:
+
+```yaml
+cpus: 1.0
+mem_limit: 512m
+pids_limit: 100
+```
+
+Runtime verification produced:
+
+```text
+Memory=536870912
+NanoCPUs=1000000000
+PidsLimit=100
+```
+
+These limits reduce the impact of runaway processes, software bugs, or resource-exhaustion behavior.
+
+---
+
+# Container Health Monitoring
+
+Docker automatically checks SteelDoor's health endpoint.
+
+The health check calls:
+
+```text
+http://localhost:8000/health
+```
+
+A healthy deployment reports:
+
+```text
+Up (healthy)
+```
+
+This allows Docker to distinguish between a container that is merely running and an application that is actually responding.
+
+---
+
+# Automatic Restart
+
+SteelDoor uses:
+
+```yaml
+restart: unless-stopped
+```
+
+Docker can restart SteelDoor following unexpected container termination unless the service was intentionally stopped.
+
+---
+
+# Secret Handling
+
+SteelDoor does not bake its API key into the Docker image.
+
+Compose requires:
+
+```text
+STEELDOOR_API_KEY
+```
+
+to exist before deployment.
+
+If the variable is missing:
+
+```bash
+docker compose config
+```
+
+fails instead of silently starting the application with broken authentication.
+
+Example:
+
+```text
+required variable STEELDOOR_API_KEY is missing a value
+```
+
+This is intentional fail-closed behavior.
+
+---
+
+# Hardened Docker Build Context
+
+`.dockerignore` prevents unnecessary development files and sensitive local files from entering the Docker build context.
+
+Current exclusions include:
 
 ```text
 __pycache__
@@ -297,43 +544,58 @@ __pycache__
 .github
 steeldoor.db
 .env
+.venv
+venv
+*.log
+tests
 ```
+
+Production containers should contain only what they need to perform their job.
 
 ---
 
-## Container Vulnerability Scanning
+# Vulnerability Management
 
-SteelDoor was analyzed with Docker Scout.
+SteelDoor's container image is scanned for known vulnerabilities.
 
-The first container scan identified:
+Docker Scout is used locally to inspect OS and package vulnerabilities.
 
-```text
-0 Critical
-3 High
-2 Medium
-24 Low
+Example:
+
+```bash
+docker scout cves local://steeldoor
 ```
 
-Investigation determined that the three High-severity findings were associated with unnecessary package-management tooling bundled inside the runtime image.
-
-Because SteelDoor does not require `pip` after dependency installation, the runtime image was hardened by removing it after the build dependencies were installed.
-
-After rebuilding the image and performing a fresh scan:
+During the September 5, 2026 development scan, Docker Scout reported:
 
 ```text
-CRITICAL  0
-HIGH      0
-MEDIUM    0
-LOW       0
+CRITICAL   0
+HIGH       1
+MEDIUM     1
+LOW       24
 ```
 
-Docker Scout reported:
+The remaining findings originated from packages included in the current base image.
+
+A fixability-focused scan was then performed:
+
+```bash
+docker scout cves --only-fixed local://steeldoor
+```
+
+Result:
 
 ```text
 No vulnerable packages detected
 ```
 
-This demonstrates a complete vulnerability-management workflow:
+At the time of that scan, SteelDoor had:
+
+```text
+0 vulnerabilities with an available fix
+```
+
+The vulnerability-management workflow is:
 
 ```text
 Build
@@ -342,57 +604,170 @@ Build
 Scan
   |
   v
-Identify Vulnerabilities
+Triage Severity
   |
   v
-Investigate Root Cause
+Check Fix Availability
   |
   v
-Reduce Attack Surface
+Remediate Actionable Findings
   |
   v
 Rebuild
   |
   v
 Rescan
-  |
-  v
-0 Detected Vulnerabilities
+```
+
+SteelDoor does not treat every scanner finding equally. Findings are evaluated according to severity, fix availability, and relevance to the running application.
+
+---
+
+# Continuous Integration
+
+SteelDoor uses GitHub Actions for automated DevSecOps checks.
+
+Every push to `main` and every pull request targeting `main` runs the CI pipeline.
+
+```text
+Git Push / Pull Request
+          |
+          v
+Checkout Source
+          |
+          v
+Set Up Python
+          |
+          v
+Install Dependencies
+          |
+          v
+Bandit SAST Scan
+          |
+          v
+pip-audit Dependency Scan
+          |
+          v
+Pytest
+          |
+          v
+Build SteelDoor Docker Image
+          |
+          v
+Trivy Container Scan
 ```
 
 ---
 
-## Technology Stack
+## Static Application Security Testing
 
-* Python 3.13
-* FastAPI
-* Pydantic
-* SQLite
-* Pytest
-* GitHub Actions
-* Bandit
-* Pip-audit
-* Docker
-* Docker Desktop / WSL 2
-* Docker Scout
+Bandit scans the Python application source:
+
+```bash
+python -m bandit -r app
+```
+
+This adds automated source-code security analysis to the pipeline.
 
 ---
 
-## API Endpoints
+## Dependency Vulnerability Scanning
 
-| Method  | Endpoint                        | Purpose                                       | Authentication |
-| ------- | ------------------------------- | --------------------------------------------- | -------------- |
-| `GET`   | `/health`                       | Verify service health                         | Public         |
-| `GET`   | `/api/info`                     | Return application information                | Public         |
-| `GET`   | `/api/greet`                    | Return a basic API greeting                   | Public         |
-| `POST`  | `/api/events`                   | Validate, store, and analyze a security event | API Key        |
-| `GET`   | `/api/events`                   | Retrieve security events                      | API Key        |
-| `GET`   | `/api/events?severity=critical` | Filter events by severity                     | API Key        |
-| `PATCH` | `/api/events/{event_id}`        | Update investigation status                   | API Key        |
+`pip-audit` checks Python dependencies against known vulnerability information:
+
+```bash
+python -m pip_audit -r requirements.txt
+```
 
 ---
 
-## Example Security Event
+## Automated Container Scanning
+
+GitHub Actions builds a fresh SteelDoor image:
+
+```bash
+docker build -t steeldoor:ci .
+```
+
+Trivy then scans the image for:
+
+```text
+CRITICAL
+HIGH
+```
+
+severity vulnerabilities.
+
+The CI configuration uses:
+
+```yaml
+exit-code: "1"
+ignore-unfixed: true
+severity: CRITICAL,HIGH
+```
+
+This means CI can block a build when an actionable Critical or High vulnerability is detected while avoiding failure solely because of vulnerabilities for which no fix exists.
+
+---
+
+# Automated Tests
+
+SteelDoor currently contains:
+
+```text
+15 passing tests
+```
+
+Run them with:
+
+```bash
+python -m pytest -v
+```
+
+Current test coverage includes:
+
+* Health endpoint behavior
+* Application information
+* Greeting endpoint
+* Security-event creation
+* Security-event retrieval
+* Severity validation
+* IP-address validation
+* Severity filtering
+* Brute-force detection
+* Detection threshold behavior
+* Detection-window expiration
+* Missing API-key rejection
+* Invalid API-key rejection
+* Rate-limit enforcement
+* Retry-After behavior
+* Invalid authentication security logging
+
+---
+
+# API Endpoints
+
+| Method  | Endpoint                        | Purpose                             | Authentication |
+| ------- | ------------------------------- | ----------------------------------- | -------------- |
+| `GET`   | `/health`                       | Service health check                | Public         |
+| `GET`   | `/api/info`                     | Application information             | Public         |
+| `GET`   | `/api/greet?name=Ty`            | Basic API greeting                  | Public         |
+| `POST`  | `/api/events`                   | Create and analyze a security event | API Key        |
+| `GET`   | `/api/events`                   | Retrieve security events            | API Key        |
+| `GET`   | `/api/events?severity=critical` | Filter events by severity           | API Key        |
+| `PATCH` | `/api/events/{event_id}/status`        | Change event investigation status   | API Key        |
+
+Interactive Swagger documentation is available at:
+
+```text
+http://localhost:8000/docs
+```
+
+---
+
+# Example Security Event
+
+Request:
 
 ```json
 {
@@ -403,19 +778,54 @@ Rescan
 }
 ```
 
-After ingestion, SteelDoor stores the event and evaluates activity from the source IP against its detection rules.
+SteelDoor validates the event, stores it, and evaluates activity from the source IP against its detection rules.
 
 ---
 
-## Run SteelDoor Locally
+# Technology Stack
 
-Install dependencies:
+## Application
+
+* Python 3.13
+* FastAPI
+* Pydantic
+* SQLite
+* Uvicorn
+
+## Testing
+
+* Pytest
+* FastAPI TestClient
+
+## DevSecOps
+
+* Git
+* GitHub
+* GitHub Actions
+* Bandit
+* pip-audit
+* Trivy
+* Docker Scout
+
+## Containers
+
+* Docker
+* Docker Compose
+* Docker Desktop
+* WSL 2
+* Linux containers
+
+---
+
+# Run SteelDoor Locally
+
+## 1. Install Dependencies
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-Set the API key.
+## 2. Set the API Key
 
 PowerShell:
 
@@ -423,13 +833,19 @@ PowerShell:
 $env:STEELDOOR_API_KEY="your-local-api-key"
 ```
 
-Start the API:
+Linux/macOS:
+
+```bash
+export STEELDOOR_API_KEY="your-local-api-key"
+```
+
+## 3. Start SteelDoor
 
 ```bash
 python -m uvicorn app.main:app --reload
 ```
 
-Open:
+## 4. Open Swagger
 
 ```text
 http://127.0.0.1:8000/docs
@@ -443,99 +859,113 @@ http://127.0.0.1:8000/health
 
 ---
 
-## Run SteelDoor with Docker
+# Run SteelDoor with Docker Compose
 
-Build the Docker image:
+Docker Compose is the recommended way to run the hardened container configuration.
+
+## 1. Set the API Key
+
+PowerShell:
+
+```powershell
+$env:STEELDOOR_API_KEY="your-local-api-key"
+```
+
+Linux/macOS:
+
+```bash
+export STEELDOOR_API_KEY="your-local-api-key"
+```
+
+## 2. Build and Start
+
+```bash
+docker compose up -d --build
+```
+
+## 3. Verify Health
+
+```bash
+docker compose ps
+```
+
+Expected status:
+
+```text
+Up (healthy)
+```
+
+## 4. Verify Non-Root Execution
+
+```bash
+docker exec steeldoor id
+```
+
+Expected:
+
+```text
+uid=1000(steeldoor)
+```
+
+## 5. Stop SteelDoor
+
+```bash
+docker compose down
+```
+
+The persistent database volume is preserved.
+
+> **Warning:** `docker compose down -v` also deletes the persistent Docker volume and should only be used when the stored SteelDoor data is intentionally being removed.
+
+---
+
+# Manual Docker Build
+
+Build:
 
 ```bash
 docker build -t steeldoor .
 ```
 
-Run the container:
+Example hardened runtime:
 
 ```bash
-docker run --rm -d \
-  --name steeldoor \
+docker run --rm \
   -p 8000:8000 \
+  --name steeldoor \
+  --cap-drop=ALL \
+  --security-opt no-new-privileges:true \
   -e STEELDOOR_API_KEY=your-api-key \
   steeldoor
 ```
 
-PowerShell users can run the command on one line:
+Docker Compose is preferred because it also defines persistence, health monitoring, resource limits, read-only storage, and restart behavior.
 
-```powershell
-docker run --rm -d --name steeldoor -p 8000:8000 -e STEELDOOR_API_KEY=your-api-key steeldoor
-```
+---
 
-Verify the container:
+# Scan the Container
 
-```bash
-docker ps
-```
-
-Verify non-root execution:
+Full vulnerability scan:
 
 ```bash
-docker exec steeldoor whoami
+docker scout cves local://steeldoor
 ```
 
-Expected result:
-
-```text
-steeldoor
-```
-
-Open Swagger:
-
-```text
-http://localhost:8000/docs
-```
-
-Open the health endpoint:
-
-```text
-http://localhost:8000/health
-```
-
-Stop SteelDoor:
+Show only vulnerabilities that currently have fixes:
 
 ```bash
-docker stop steeldoor
+docker scout cves --only-fixed local://steeldoor
+```
+
+Base-image recommendations:
+
+```bash
+docker scout recommendations local://steeldoor
 ```
 
 ---
 
-## Scan the Docker Image
-
-Run a vulnerability overview:
-
-```bash
-docker scout quickview steeldoor
-```
-
-Scan for Critical and High vulnerabilities:
-
-```bash
-docker scout cves local://steeldoor --only-severity critical,high
-```
-
----
-
-## Run the Tests
-
-```bash
-python -m pytest -v
-```
-
-Current result:
-
-```text
-15 passed
-```
-
----
-
-## Project Structure
+# Project Structure
 
 ```text
 DevSecOps-Portfolio/
@@ -559,6 +989,7 @@ DevSecOps-Portfolio/
 |
 |-- .dockerignore
 |-- .gitignore
+|-- compose.yaml
 |-- Dockerfile
 |-- README.md
 `-- requirements.txt
@@ -566,100 +997,285 @@ DevSecOps-Portfolio/
 
 ---
 
-## Security Controls Implemented
+# Security Controls Implemented
 
-| Control                            | Status |
-| ---------------------------------- | ------ |
-| Input validation                   | ✅      |
-| IPv4 / IPv6 validation             | ✅      |
-| Severity enforcement               | ✅      |
-| API-key authentication             | ✅      |
-| Environment-based secrets          | ✅      |
-| Constant-time secret comparison    | ✅      |
-| Missing credential rejection       | ✅      |
-| Invalid credential rejection       | ✅      |
-| API rate limiting                  | ✅      |
-| `Retry-After` responses            | ✅      |
-| Security logging                   | ✅      |
-| Brute-force detection              | ✅      |
-| Automated tests                    | ✅      |
-| SAST with Bandit                   | ✅      |
-| Dependency scanning with Pip-audit | ✅      |
-| Docker containerization            | ✅      |
-| Non-root container execution       | ✅      |
-| Docker vulnerability scanning      | ✅      |
-| GitHub Actions CI                  | ✅      |
+| Security Control                    | Status |
+| ----------------------------------- | :----: |
+| Input validation                    |    ✅   |
+| IPv4 / IPv6 validation              |    ✅   |
+| Severity enforcement                |    ✅   |
+| API-key authentication              |    ✅   |
+| Runtime secret injection            |    ✅   |
+| Constant-time secret comparison     |    ✅   |
+| Missing credential rejection        |    ✅   |
+| Invalid credential rejection        |    ✅   |
+| API rate limiting                   |    ✅   |
+| Retry-After responses               |    ✅   |
+| Security logging                    |    ✅   |
+| Brute-force detection               |    ✅   |
+| Structured alerts                   |    ✅   |
+| SQLite persistence                  |    ✅   |
+| Configurable database path          |    ✅   |
+| Persistent Docker volume            |    ✅   |
+| Automated tests                     |    ✅   |
+| Bandit SAST                         |    ✅   |
+| pip-audit dependency scanning       |    ✅   |
+| GitHub Actions CI                   |    ✅   |
+| Docker containerization             |    ✅   |
+| Non-root container execution        |    ✅   |
+| Linux capabilities dropped          |    ✅   |
+| Privilege escalation blocked        |    ✅   |
+| Read-only container filesystem      |    ✅   |
+| Writable data isolation             |    ✅   |
+| Temporary in-memory `/tmp`          |    ✅   |
+| Automatic health checks             |    ✅   |
+| Automatic restart policy            |    ✅   |
+| CPU resource limit                  |    ✅   |
+| Memory resource limit               |    ✅   |
+| PID/process limit                   |    ✅   |
+| Hardened Docker build context       |    ✅   |
+| Docker Scout vulnerability scanning |    ✅   |
+| Trivy CI container scanning         |    ✅   |
+| Actionable vulnerability gating     |    ✅   |
 
 ---
 
-## Roadmap
+# SteelDoor v1 Threat Model
 
-### SteelDoor v1
+SteelDoor v1 assumes that an attacker may attempt to:
+
+* Send malformed security-event data
+* Access protected endpoints without credentials
+* Guess or submit invalid API keys
+* Flood protected API endpoints
+* Trigger excessive application resource consumption
+* Exploit a vulnerability in the application or dependency
+* Modify files after compromising the running process
+* Escalate privileges inside the container
+* Abuse unnecessary Linux capabilities
+* Cause container replacement or restart in an attempt to destroy data
+
+SteelDoor addresses these risks with layered controls:
+
+```text
+Malformed Input
+      -> Pydantic Validation
+
+Unauthorized Request
+      -> API-Key Authentication
+
+Secret Comparison Attack
+      -> secrets.compare_digest()
+
+Request Flooding
+      -> Per-Client Rate Limiting
+
+Compromised Application
+      -> Non-Root User
+      -> Drop ALL Capabilities
+      -> No New Privileges
+      -> Read-Only Filesystem
+
+Resource Exhaustion
+      -> CPU Limit
+      -> Memory Limit
+      -> PID Limit
+
+Container Destruction
+      -> Persistent Docker Volume
+
+Known Vulnerabilities
+      -> Bandit
+      -> pip-audit
+      -> Docker Scout
+      -> Trivy
+
+Broken Deployment
+      -> Docker Health Check
+      -> Restart Policy
+
+Unsafe Code Change
+      -> Automated CI Pipeline
+      -> Automated Tests
+```
+
+The goal is not to assume compromise is impossible.
+
+The goal is to reduce the likelihood and potential impact of compromise through defense in depth and least privilege.
+
+---
+
+# Design Decisions
+
+## Why SQLite?
+
+SQLite keeps SteelDoor v1 lightweight and allows the project to focus on DevSecOps concepts rather than database infrastructure.
+
+A future distributed deployment would likely move persistence to an external database service.
+
+## Why an In-Memory Rate Limiter?
+
+The current rate limiter demonstrates request-throttling logic without requiring another service.
+
+A horizontally scaled deployment would require shared rate-limit state.
+
+## Why API Keys?
+
+API-key authentication provides a simple way to practice:
+
+* Secret handling
+* Protected endpoints
+* Authentication failures
+* Constant-time secret comparison
+* Environment-based configuration
+
+A production application could later integrate stronger identity systems such as OAuth 2.0 or OIDC.
+
+## Why Docker Compose?
+
+Compose makes the hardened runtime configuration repeatable.
+
+Instead of relying on a developer to remember a long collection of Docker flags, security controls are defined as code in:
+
+```text
+compose.yaml
+```
+
+---
+
+# What I Learned Building SteelDoor
+
+SteelDoor was built as an intensive hands-on DevSecOps learning project.
+
+The project progressed from a basic Python API into a layered security deployment by repeatedly:
+
+1. Building a feature
+2. Testing it
+3. Breaking it intentionally
+4. Debugging the failure
+5. Adding a security control
+6. Verifying the control at runtime
+7. Automating the check where practical
+8. Committing the working checkpoint to Git
+
+Key concepts practiced include:
+
+* REST API development
+* Input validation
+* Authentication
+* Secret management
+* Least privilege
+* Defense in depth
+* Rate limiting
+* Threat detection
+* Security logging
+* Automated testing
+* CI pipelines
+* Static security analysis
+* Dependency auditing
+* Containerization
+* Docker networking
+* Persistent volumes
+* Read-only filesystems
+* Linux capabilities
+* Resource controls
+* Container health monitoring
+* Vulnerability scanning
+* Vulnerability triage
+* Fail-closed configuration
+
+---
+
+# v1 Status
+
+**SteelDoor v1 is functionally complete.**
+
+The v1 milestone includes:
 
 * [x] Security-event REST API
 * [x] SQLite persistence
 * [x] Event validation
+* [x] Severity filtering
+* [x] Event investigation status
 * [x] Brute-force detection
 * [x] Structured security alerts
 * [x] API-key authentication
 * [x] Environment-based secrets
-* [x] API rate limiting
-* [x] Structured security logging
+* [x] Rate limiting
+* [x] Security logging
+* [x] Automated testing
+* [x] Bandit scanning
+* [x] Dependency auditing
+* [x] GitHub Actions CI
 * [x] Docker containerization
-* [x] Non-root container execution
-* [x] Container vulnerability scanning
-* [ ] Additional application metrics
-* [ ] Readiness/database health checks
-* [ ] Container security scanning in CI/CD
-* [ ] Secret scanning
-* [ ] Cloud deployment
-* [ ] Final architecture documentation
-
-### Future Expansion
-
-* Additional detection rules
-* Persistent alert storage
-* Alert-management endpoints
-* Pagination and advanced event filtering
-* PostgreSQL support
-* Prometheus-compatible metrics
-* Monitoring and observability
-* Infrastructure as Code
-* Cloud IAM and secrets management
-* Expanded CI/CD security gates
+* [x] Non-root execution
+* [x] Container hardening
+* [x] Persistent Docker storage
+* [x] Health monitoring
+* [x] Runtime resource limits
+* [x] Docker Scout scanning
+* [x] Trivy CI scanning
 
 ---
 
-## Project Status
+# Future Improvements
 
-SteelDoor is under active development as a hands-on DevSecOps portfolio project focused on building, securing, testing, containerizing, scanning, and deploying a production-style security application.
+SteelDoor v1 is intentionally scoped as a portfolio and learning project.
 
-The project is designed to demonstrate not only application development, but the complete DevSecOps lifecycle:
+Possible future versions could explore:
+
+* PostgreSQL
+* Redis-backed distributed rate limiting
+* OAuth 2.0 / OIDC
+* Role-based access control
+* Additional detection rules
+* Metrics and dashboards
+* Prometheus
+* Grafana
+* Centralized log aggregation
+* Cloud deployment
+* Kubernetes
+* Infrastructure as Code
+* External secret management
+
+Those technologies are intentionally outside the SteelDoor v1 scope and are better suited to future cloud-native projects.
+
+---
+
+# Portfolio Purpose
+
+SteelDoor is a hands-on DevSecOps portfolio project.
+
+Its purpose is to demonstrate the ability to think about software as more than application code.
+
+The project combines:
 
 ```text
-Develop
-   |
-   v
-Test
-   |
-   v
-Secure
-   |
-   v
-Containerize
-   |
-   v
-Scan
-   |
-   v
-Harden
-   |
-   v
-Automate
-   |
-   v
-Deploy
-   |
-   v
-Monitor
+Development
++
+Security
++
+Testing
++
+Automation
++
+Containers
++
+Operations
+```
+
+into a single working system.
+
+SteelDoor is not presented as a production security product or replacement for a commercial SIEM, IDS, WAF, or authentication platform.
+
+It is a practical demonstration of DevSecOps principles and the progression from:
+
+```text
+"It runs."
+```
+
+to:
+
+```text
+"It runs, it is tested, it is monitored, it is hardened, and the security checks are automated."
 ```
