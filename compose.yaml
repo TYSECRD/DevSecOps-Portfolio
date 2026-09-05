@@ -1,0 +1,36 @@
+services:
+  steeldoor:
+    build: .
+    image: steeldoor:latest
+    container_name: steeldoor
+    ports:
+      - "8000:8000"
+    environment:
+      STEELDOOR_API_KEY: ${STEELDOOR_API_KEY:?STEELDOOR_API_KEY must be set}
+      STEELDOOR_DATABASE_PATH: /app/data/steeldoor.db
+    volumes:
+      - steeldoor_data:/app/data
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    restart: unless-stopped
+    cpus: 1.0
+    mem_limit: 512m
+    pids_limit: 100
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  steeldoor_data:

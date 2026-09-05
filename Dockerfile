@@ -12,7 +12,7 @@ RUN useradd --create-home steeldoor
 
 COPY app ./app
 
-RUN chown -R steeldoor:steeldoor /app
+RUN mkdir -p /app/data && chown -R steeldoor:steeldoor /app
 
 USER steeldoor
 

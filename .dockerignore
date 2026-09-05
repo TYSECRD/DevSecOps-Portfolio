@@ -5,3 +5,7 @@ __pycache__
 .github
 steeldoor.db
 .env
+.venv
+venv
+*.log
+tests
